@@ -21,7 +21,7 @@ object WifipixStreaming {
     val wifipixUserMacPair = lines.map(line => {
       val cols = line.split("\t")
       val date = cols(1).substring(0, 10)
-      // wifipix_mac:date    user_mac
+      // wifipix_mac#date    user_mac
       (cols(0) + "#" + date, 1)
 
     })
@@ -32,12 +32,11 @@ object WifipixStreaming {
       Some(currentCount + previousCount)
     }
 
-    //  val userMacCounts = wifipixUserMacPair.reduceByKey(_ + _)
     val totalMacCounts = wifipixUserMacPair.updateStateByKey[Int](addFunc)
 
     totalMacCounts.foreachRDD { rdd =>
       rdd.foreachPartition { partitionOfRecords =>
-        val conn = ConnectionPool.getConnection()
+        val conn = ConnectionPool.getConnection("jdbc:mysql://172.30.103.14:3306/test", "masa", "masa")
         conn.setAutoCommit(false)
         val stmt = conn.createStatement()
         partitionOfRecords.foreach (
@@ -51,7 +50,7 @@ object WifipixStreaming {
         stmt.executeBatch()
         conn.commit()
 
-        ConnectionPool.closeCon(null, stmt, conn)  // return to the pool for future reuse
+        ConnectionPool.closeConn(null, stmt, conn)  // return to the pool for future reuse
       }
     }
 

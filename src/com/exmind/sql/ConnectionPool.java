@@ -20,13 +20,13 @@ public class ConnectionPool {
      * 创建数据源
      * @return
      */
-    public static BasicDataSource getDataSource() throws Exception{
+    public static BasicDataSource getDataSource(String dbUrl, String userName, String password) throws Exception{
         if(bs==null){
             bs = new BasicDataSource();
             bs.setDriverClassName("com.mysql.jdbc.Driver");
-            bs.setUrl("jdbc:mysql://172.30.103.14:3306/test");
-            bs.setUsername("masa");
-            bs.setPassword("masa");
+            bs.setUrl(dbUrl);
+            bs.setUsername(userName);
+            bs.setPassword(password);
             bs.setMaxActive(100);//设置最大并发数
             bs.setInitialSize(20);//数据库初始化时，创建的连接个数
             bs.setMinIdle(50);//最小空闲连接数
@@ -52,13 +52,13 @@ public class ConnectionPool {
      * 获取数据库连接
      * @return
      */
-    public static Connection getConnection(){
+    public static Connection getConnection(String dbUrl, String userName, String password){
         Connection con=null;
         try {
             if(bs!=null){
                 con=bs.getConnection();
             }else{
-                con=getDataSource().getConnection();
+                con=getDataSource(dbUrl, userName, password).getConnection();
             }
         } catch (Exception e) {
             log.error(e.getMessage(), e);
@@ -69,7 +69,7 @@ public class ConnectionPool {
     /**
      * 关闭连接
      */
-    public static void closeCon(ResultSet rs, Statement ps, Connection con){
+    public static void closeConn(ResultSet rs, Statement ps, Connection con){
         if(rs!=null){
             try {
                 rs.close();
