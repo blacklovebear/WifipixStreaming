@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="WifipixStreaming:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/WifipixStreaming_jar</output-path>
+    <root id="archive" name="WifipixStreaming.jar">
+      <element id="module-output" name="WifipixStreaming" />
+    </root>
+  </artifact>
+</component>
