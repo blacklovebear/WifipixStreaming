@@ -15,7 +15,7 @@ import scala.util.Try
   */
 object WifipixStreaming {
 
-  def save_day_visit_user_with_visit_time(lines: ReceiverInputDStream[String]) = {
+  def save_day_visit_user_with_visit_time(lines: ReceiverInputDStream[String]): Unit = {
     val mappingFunc= (key: (String, String, String), value: Option[(Int, String)], state:State[(Int,String,String)]) => {
       val stateValue: (Int, String, String) = state.getOption().getOrElse[(Int,String,String)]((0,"",""))
       val newValue: (Int, String) = value.getOrElse[(Int,String)]((0, ""))
@@ -40,9 +40,7 @@ object WifipixStreaming {
       // timeout function intent delete  over time key
       .mapWithState(StateSpec.function(mappingFunc).timeout(Minutes(60 * 24)))
         // change to (wifipix_mac, date) => (客流量，到店客户，用户访问时长)
-      .map( keyValuePair => {
-        val key = keyValuePair._1
-        val value = keyValuePair._2
+      .map{ case (key, value) =>
         val firstDate = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss").parse(key._2 + " " + value._2)
         val lastDate = new SimpleDateFormat("yyyy-mm-dd HH:mm:ss").parse(key._2 + " " + value._3)
 
@@ -56,17 +54,14 @@ object WifipixStreaming {
         }
 
         ((key._1, key._2), resultValue match {case Array(a,b,c) => (a,b,c)} )
-      })
+      }
       .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2, x._3 + y._3))
       .foreachRDD { rdd =>
         rdd.foreachPartition { partitionOfRecords =>
           val conn = ConnectionPool.getConnection("jdbc:mysql://172.30.103.14:3306/test", "masa", "masa")
           conn.setAutoCommit(false)
           val stmt = conn.createStatement()
-          partitionOfRecords.foreach (
-            record => {
-              val key = record._1
-              val value = record._2
+          partitionOfRecords.foreach { case (key, value) =>
               val avgDuration = Try( value._3/ value._1).getOrElse(0)
 
               stmt.addBatch("insert into wifipix_online_with_time(wifipix_mac, load_date, passenger_flow, shop_count, avg_duration_minute) " +
@@ -76,7 +71,7 @@ object WifipixStreaming {
                 "shop_count = IF(shop_count < "+ value._2 +", "+ value._2 +", shop_count), " +
                 "avg_duration_minute = IF(avg_duration_minute < "+ avgDuration +", "+ avgDuration +", avg_duration_minute)"
               )
-            })
+            }
 
           stmt.executeBatch()
           conn.commit()
@@ -85,7 +80,7 @@ object WifipixStreaming {
       }
   }
 
-  def save_day_visit_user(lines: ReceiverInputDStream[String]) = {
+  def save_day_visit_user(lines: ReceiverInputDStream[String]): Unit = {
     val mappingFunc= (key: (String, String, String), value: Option[Int], state:State[Int]) => {
       val sum = value.getOrElse(0) + state.getOption().getOrElse(0)
       state.update(sum)
@@ -102,26 +97,22 @@ object WifipixStreaming {
       // timeout function intent delete  over time key
       .mapWithState(StateSpec.function(mappingFunc).timeout(Minutes(60 * 24)))
         // change to (wifipix_mac, date) => (tatal, unique)
-      .map( keySum => {
-        val key = keySum._1
-        ((key._1, key._2), (keySum._2, 1))
-      })
+      .map { case (key, value) =>
+        ((key._1, key._2), (value, 1))
+      }
       .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
       .foreachRDD { rdd =>
         rdd.foreachPartition { partitionOfRecords =>
           val conn = ConnectionPool.getConnection("jdbc:mysql://172.30.103.14:3306/test", "masa", "masa")
           conn.setAutoCommit(false)
           val stmt = conn.createStatement()
-          partitionOfRecords.foreach (
-            record => {
-              val key = record._1
-              val value = record._2
+          partitionOfRecords.foreach { case (key, value) =>
               stmt.addBatch("insert into wifipix_online(wifipix_mac, load_date, user_mac_count, unique_mac_count) " +
                 "values('"+ key._1 +"', '"+ key._2 +"', "+ value._1 +", "+ value._2 +")  " +
                 "on duplicate key update " +
                 "user_mac_count = IF(user_mac_count < "+ value._1 +", "+ value._1 +", user_mac_count), " +
                 "unique_mac_count = IF(unique_mac_count < "+ value._2 +", "+ value._2 +", unique_mac_count)")
-            })
+          }
 
           stmt.executeBatch()
           conn.commit()
@@ -131,7 +122,7 @@ object WifipixStreaming {
   }
 
 
-  def save_hour_visit_user(lines: ReceiverInputDStream[String]) = {
+  def save_hour_visit_user(lines: ReceiverInputDStream[String]): Unit = {
     val mappingFunc= (key: (String, String, String, String), value: Option[Int], state:State[Int]) => {
       val sum = value.getOrElse(0) + state.getOption().getOrElse(0)
       state.update(sum)
@@ -149,27 +140,21 @@ object WifipixStreaming {
       // timeout function intent delete  over time key
       .mapWithState(StateSpec.function(mappingFunc).timeout(Minutes(60)))
       // change to (wifipix_mac, date, hour) => (tatal, unique)
-      .map( keySum => {
-        val key = keySum._1
-        ((key._1, key._2, key._3), (keySum._2, 1))
-      })
+      .map { case (key, value) => ((key._1, key._2, key._3), (value, 1)) }
       .reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2))
       .foreachRDD { rdd =>
         rdd.foreachPartition { partitionOfRecords =>
           val conn = ConnectionPool.getConnection("jdbc:mysql://172.30.103.14:3306/test", "masa", "masa")
           conn.setAutoCommit(false)
           val stmt = conn.createStatement()
-          partitionOfRecords.foreach (
-            record => {
-              val key = record._1
-              val value = record._2
-              stmt.addBatch("insert into wifipix_online_hour(wifipix_mac, load_date, load_hour, user_mac_count, unique_mac_count) " +
-                "values('"+ key._1 +"', '"+ key._2 +"', '"+ key._3 +"', "+ value._1 +", "+ value._2 +")  " +
-                "on duplicate key update " +
-                "user_mac_count = IF(user_mac_count < "+ value._1 +", "+ value._1 +", user_mac_count), " +
-                "unique_mac_count = IF(unique_mac_count < "+ value._2 +", "+ value._2 +", unique_mac_count)")
-            })
 
+          partitionOfRecords.foreach { case (key, value) =>
+            stmt.addBatch("insert into wifipix_online_hour(wifipix_mac, load_date, load_hour, user_mac_count, unique_mac_count) " +
+              "values('"+ key._1 +"', '"+ key._2 +"', '"+ key._3 +"', "+ value._1 +", "+ value._2 +")  " +
+              "on duplicate key update " +
+              "user_mac_count = IF(user_mac_count < "+ value._1 +", "+ value._1 +", user_mac_count), " +
+              "unique_mac_count = IF(unique_mac_count < "+ value._2 +", "+ value._2 +", unique_mac_count)")
+          }
           stmt.executeBatch()
           conn.commit()
           ConnectionPool.closeConn(null, stmt, conn)  // return to the pool for future reuse
@@ -178,7 +163,6 @@ object WifipixStreaming {
   }
 
   def main(args: Array[String]): Unit = {
-
     val conf = new SparkConf().setAppName("Wifipix Streaming")
     val ssc = new StreamingContext(conf, Seconds(30))
     ssc.checkpoint("./checkpoint")

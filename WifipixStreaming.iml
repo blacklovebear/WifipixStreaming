@@ -10,5 +10,7 @@
     <orderEntry type="library" name="scala-sdk-2.10.6" level="application" />
     <orderEntry type="library" name="spark-assembly-1.6.1-hadoop2.6.0" level="project" />
     <orderEntry type="library" name="commons-dbcp:commons-dbcp:1.4" level="project" />
+    <orderEntry type="library" name="mysql-connector-java-5.1.30" level="project" />
+    <orderEntry type="library" name="orestes-bf-with-deps" level="project" />
   </component>
 </module>

@@ -1,9 +1,6 @@
 package com.exmind.sql;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.sql.*;
 
 import org.apache.commons.dbcp.BasicDataSource;
 import org.apache.log4j.Logger;
@@ -62,6 +59,27 @@ public class ConnectionPool {
             }
         } catch (Exception e) {
             log.error(e.getMessage(), e);
+        }
+        return con;
+    }
+
+    public static void init(String dbUrl, String userName, String password) {
+        try {
+            getDataSource(dbUrl, userName, password);
+        } catch (Exception e) {
+            e.printStackTrace();
+            log.error(e.getMessage(), e);
+        }
+    }
+
+    public static Connection getConnection() {
+        Connection con=null;
+        if (bs != null){
+            try {
+                con = bs.getConnection();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
         return con;
     }
